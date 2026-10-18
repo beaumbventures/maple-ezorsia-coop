@@ -13,3 +13,9 @@ with no limit (`fixWnd()` + `ExitProcess`), so the game never appeared and Task 
 - A failed window no longer relaunches the game: it logs the error, shows a message box once and exits.
 - Progress markers in the rewritten `SetUp`.
 - GitHub Actions workflow builds `dinput8.dll` (Release x86) on every push to main; when `RELEASE_TAG` names a new tag, that build is published as a release.
+
+## Build 2 (coop-2): the actual fix
+- `CWvsApp::CWvsApp` rewrite: `TSingleton<CWvsApp>::ms_pInstance` (0xBE7B38) was set only if `m_hWnd` was non-null,
+  but `m_hWnd` is uninitialized at that point. With zeroed memory the singleton stayed NULL, the game's window procedure
+  returned 0 for every message (including `WM_NCCREATE`), and `CreateWindowExA` failed with `GetLastError` = 0, which
+  upstream then "fixed" by relaunching forever. Now it always stores `this`. Found from build 1's `Ezorsia.log`.

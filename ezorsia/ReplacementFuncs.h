@@ -2202,7 +2202,10 @@ static _sub_9F4FDA_t _sub_9F4FDA_rewrite = [](CWvsApp* pThis, void* edx, const c
 	}
 	edx = nullptr;
 	CWvsApp* v3 = pThis;//function=void __thiscall CWvsApp::CWvsApp(CWvsApp *this, const char *sCmdLine)
-	*_dword_BE7B38 = pThis->m_hWnd != nullptr ? pThis : nullptr;//protected: static class CWvsApp * TSingleton<class CWvsApp>::ms_pInstance
+	// maple-v83-coop: the decompiled original made the singleton depend on m_hWnd, which is still uninitialized here.
+	// When that memory happened to be zero, ms_pInstance stayed NULL, CWvsApp's window procedure (0x9FE8C9) returned 0
+	// for WM_NCCREATE, and CreateWindowExA failed with no error. TSingleton just stores this.
+	*_dword_BE7B38 = pThis;//protected: static class CWvsApp * TSingleton<class CWvsApp>::ms_pInstance
 	pThis->m_hWnd = nullptr;//pThis[1] = 0; //unlikely to be wrong because [3] is assigned a unsigned int further down that matches
 										//type and name of m_dwMainThreadId
 	// 
