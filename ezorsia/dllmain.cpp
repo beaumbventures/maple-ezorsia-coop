@@ -82,7 +82,10 @@ void MainProc() { MainMain::CreateInstance(MainFunc); }
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved) {
 	switch (ul_reason_for_call) {
 	case DLL_PROCESS_ATTACH:
-	{	//MainMain::CreateConsole(MainMain::stream);//console for devs, use this to log stuff if you want
+	{	// maple-v83-coop: send v2's console output to Ezorsia.log (unbuffered) so startup problems can be read afterwards
+		{ FILE* fLog = nullptr; if (freopen_s(&fLog, "Ezorsia.log", "w", stdout) == 0) { setvbuf(stdout, nullptr, _IONBF, 0); } }
+		std::cout << "maple-v83-coop Ezorsia v2 build (logging, no relaunch loop), pid " << GetCurrentProcessId() << ", cmdline: " << GetCommandLineA() << std::endl;
+		//MainMain::CreateConsole(MainMain::stream);//console for devs, use this to log stuff if you want
 		MainMain::mainTHread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, GetCurrentThreadId());
 
 		//windows API hooks(for ones that are called by the maplestory client)//there is more than this, but the default ones in the client template mostly do logging
@@ -91,6 +94,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 		//anti-cheat(that you bought from the anti-cheat company) into the exe. or could potentially be used to install miners or kill registry (dont do these last 2)
 		Hook_CreateMutexA(true);//Sleep(42);//not in-game edit //multiclient //ty darter, angel, and alias! //new one: credits to the creators of https://github.com/MapleStory-Archive/MapleClientEditTemplate
 		Hook_WSPStartup(true);//allows to set IP for default installed client//credits to the creators of https://github.com/MapleStory-Archive/MapleClientEditTemplate
+		Hook_RegisterClassExA(true);//maple-v83-coop: logging
 		Hook_CreateWindowExA(true);//not in-game edit//enables minimize button //default ezorsia
 		Hook_FindFirstFileA(true);//kills check for .dll already in dir//ty joo for advice with this, check out their releases: https://github.com/OpenRustMS
 		Hook_GetACP(true);//either kills locale checks or feeds the server custom data//credits to the creators of https://github.com/MapleStory-Archive/MapleClientEditTemplate

@@ -46,13 +46,20 @@ HWND WINAPI CreateWindowExA_Hook(DWORD dwExStyle, LPCSTR lpClassName, LPCSTR lpW
 		std::cout << "HookCreateWindowExA started" << std::endl;
 		HookCreateWindowExA_initialized = false;
 	}
-	if(strstr(lpClassName, "MapleStoryClass"))
+	const bool namedClass = HIWORD(lpClassName) != 0;
+	std::cout << "CreateWindowExA class=" << (namedClass ? lpClassName : "(atom)") << " title=" << (lpWindowName ? lpWindowName : "(null)")
+		<< std::hex << " exstyle=0x" << dwExStyle << " style=0x" << dwStyle << std::dec << " pos=" << X << "," << Y << " size=" << nWidth << "x" << nHeight
+		<< " hInstance=" << hInstance << std::endl;
+	if(namedClass && strstr(lpClassName, "MapleStoryClass"))
 	{
 		dwStyle |= WS_MINIMIZEBOX; // enable minimize button
 		HWND ret  = CreateWindowExA_Original(dwExStyle, lpClassName, lpWindowName, dwStyle, X, Y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
+		DWORD err = GetLastError();
+		std::cout << "  -> MapleStoryClass window " << ret << (ret ? "" : " FAILED") << ", GetLastError=" << err << std::endl;
+		SetLastError(err);
 		return ret;
 	}
-	else if (strstr(lpClassName, "StartUpDlgClass"))
+	else if (namedClass && strstr(lpClassName, "StartUpDlgClass"))
 	{
 		return NULL; //kill startup balloon
 	}
@@ -62,6 +69,18 @@ HWND WINAPI CreateWindowExA_Hook(DWORD dwExStyle, LPCSTR lpClassName, LPCSTR lpW
 	//}
 	return CreateWindowExA_Original(dwExStyle, lpClassName, lpWindowName, dwStyle, X, Y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
 };
+bool Hook_RegisterClassExA(bool bEnable) {	// maple-v83-coop: logging only
+	static decltype(&RegisterClassExA) _RegisterClassExA = &RegisterClassExA;
+	const decltype(&RegisterClassExA) RegisterClassExA_Hook = [](const WNDCLASSEXA* wc) -> ATOM {
+		ATOM a = _RegisterClassExA(wc);
+		DWORD err = GetLastError();
+		std::cout << "RegisterClassExA class=" << ((wc && HIWORD(wc->lpszClassName)) ? wc->lpszClassName : "(atom/null)")
+			<< " cbSize=" << (wc ? wc->cbSize : 0) << " hInstance=" << (wc ? wc->hInstance : nullptr) << " -> atom " << a << ", GetLastError=" << err << std::endl;
+		SetLastError(err);
+		return a;
+	};
+	return Memory::SetHook(bEnable, reinterpret_cast<void**>(&_RegisterClassExA), RegisterClassExA_Hook);
+}
 bool Hook_CreateWindowExA(bool bEnable) {
 	return Memory::SetHook(bEnable, reinterpret_cast<void**>(&CreateWindowExA_Original), CreateWindowExA_Hook);
 }
@@ -1876,14 +1895,21 @@ static _sub_9F5239_t _sub_9F5239_rewrite = [](CWvsApp* pThis, void* edx) {
 	//}
 
 	(*_dword_BF1AC8) = 16;//TSingleton<CConfig>::GetInstance()->m_sysOpt.bSysOpt_WindowedMode;
+	std::cout << "SetUp: InitializeAuth done, calling InitializePCOM" << std::endl;
 	_sub_9F6D77(v14);//void __thiscall CWvsApp::InitializePCOM(CWvsApp *this)
+	std::cout << "SetUp: InitializePCOM done, calling CreateMainWindow" << std::endl;
 
 	//void __thiscall CWvsApp::CreateMainWindow(CWvsApp *this) //a bit broken...previous fix just resulted in error 0 in my code instead
 	_sub_9F6D97(v14); 
 	if (!v14->m_hWnd) 
 	{ 
-		std::cout << "failed to create game window...trying again..." << std::endl;//Sleep(2000);
-		fixWnd(); ExitProcess(0);
+		// maple-v83-coop: the stock code relaunched the game here with no limit (fixWnd + ExitProcess), which on the
+		// HeavenMS localhost became an endless chain of processes. Report once and exit instead.
+		DWORD err = GetLastError();
+		std::cout << "failed to create game window (GetLastError=" << err << "), exiting without relaunch" << std::endl;
+		char msg[256]; sprintf_s(msg, "The game window could not be created (error %lu).\n\nDetails are in Ezorsia.log in the game folder.", err);
+		MessageBoxA(NULL, msg, "MapleStory co-op", MB_OK | MB_ICONERROR);
+		ExitProcess(1);
 	} 
 	_sub_9F9E53();//CClientSocket *__cdecl TSingleton<CClientSocket>::CreateInstance()
 	_sub_9F6F27(v14);//void __thiscall CWvsApp::ConnectLogin(CWvsApp *this)
