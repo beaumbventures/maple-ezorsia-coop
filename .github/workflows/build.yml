@@ -1,16 +1,11 @@
 # maple-v83-coop: builds dinput8.dll (Release|x86) on GitHub's Windows runners.
-# Every push uploads the DLL as a build artifact. Running it manually (workflow_dispatch) with a release_tag,
-# e.g. "coop-1", also publishes the DLL as a GitHub release with that tag on the built commit.
+# Every push to main builds dinput8.dll and uploads it as an artifact. If RELEASE_TAG (repo root) names a tag
+# that has no release yet, e.g. "coop-1", the build also publishes the DLL as that release on the built commit.
 name: build
 on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: "Release tag to publish (e.g. coop-2); leave empty for a build only"
-        required: false
-        default: ""
 permissions:
   contents: write
 jobs:
@@ -33,9 +28,14 @@ jobs:
           path: |
             out/Release/dinput8.dll
             out/Release/dinput8.dll.sha256
-      - name: Publish release
-        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+      - name: Publish release (RELEASE_TAG)
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ inputs.release_tag }}" out/Release/dinput8.dll out/Release/dinput8.dll.sha256 --target "${{ github.sha }}" --title "${{ inputs.release_tag }}" --notes "Ezorsia v2 build for maple-v83-coop from ${{ github.sha }} (see COOP-CHANGES.md)."
+        run: |
+          if (-not (Test-Path RELEASE_TAG)) { "No RELEASE_TAG file; build only."; exit 0 }
+          $tag = (Get-Content RELEASE_TAG -TotalCount 1).Trim()
+          if (-not $tag) { "RELEASE_TAG is empty; build only."; exit 0 }
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { "Release $tag already exists; build only."; exit 0 }
+          gh release create $tag out/Release/dinput8.dll out/Release/dinput8.dll.sha256 --target "${{ github.sha }}" --title $tag --notes "Ezorsia v2 build for maple-v83-coop from ${{ github.sha }} (see COOP-CHANGES.md)."

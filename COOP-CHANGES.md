@@ -12,4 +12,4 @@ with no limit (`fixWnd()` + `ExitProcess`), so the game never appeared and Task 
 - `RegisterClassExA` and `CreateWindowExA` calls are logged with their arguments, result and `GetLastError`.
 - A failed window no longer relaunches the game: it logs the error, shows a message box once and exits.
 - Progress markers in the rewritten `SetUp`.
-- GitHub Actions workflow builds `dinput8.dll` (Release x86) on every push to main; a manual run with `release_tag` publishes a release.
+- GitHub Actions workflow builds `dinput8.dll` (Release x86) on every push to main; when `RELEASE_TAG` names a new tag, that build is published as a release.
